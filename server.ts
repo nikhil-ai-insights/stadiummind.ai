@@ -3,13 +3,39 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import { z } from "zod";
+import rateLimit from "express-rate-limit";
 
 dotenv.config();
+
+// Sanitization utility to protect against prompt injection, malicious instructions, and XSS
+function sanitizeInput(text: string): string {
+  if (typeof text !== "string") return "";
+  // 1. Remove dangerous script or HTML tags to prevent XSS
+  let sanitized = text.replace(/<[^>]*>/g, "");
+  // 2. Redact system instruction override attempts
+  sanitized = sanitized.replace(/(ignore previous instructions|system prompt|system instruction|override|you are now)/gi, "[REDACTED_SYSTEM_DIRECTIVE]");
+  // 3. Prevent buffer/memory overflow payloads by limiting text size
+  if (sanitized.length > 2000) {
+    sanitized = sanitized.substring(0, 2000) + "... (truncated)";
+  }
+  return sanitized;
+}
 
 const app = express();
 const PORT = 3000;
 
+// Set up security rate limiter on APIs to protect stadium network
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests from this IP, please try again later." }
+});
+
 app.use(express.json());
+app.use("/api/", apiLimiter);
 
 // Securely initialize Google GenAI SDK
 // Accessing GEMINI_API_KEY from environment variables only
@@ -60,10 +86,45 @@ const STADIUM_CONTEXT = {
   ]
 };
 
+// Zod schemas for input validation and strict type guarantees
+const ChatSchema = z.object({
+  message: z.string().min(1).max(1000),
+  history: z.array(z.object({
+    role: z.string().max(20),
+    content: z.string().max(2000)
+  })).optional()
+});
+
+const TranslateSchema = z.object({
+  text: z.string().min(1).max(1000),
+  targetLanguage: z.string().min(1).max(50)
+});
+
+const SustainabilitySchema = z.object({
+  startSection: z.string().min(1).max(100),
+  endSection: z.string().min(1).max(100)
+});
+
+const EmergencySchema = z.object({
+  type: z.string().min(1).max(100),
+  location: z.string().min(1).max(100),
+  details: z.string().max(1000).optional().nullable()
+});
+
+const VolunteerSchema = z.object({
+  category: z.string().min(1).max(100).optional(),
+  query: z.string().min(1).max(1000).optional()
+});
+
 // 1. AI Stadium Assistant Endpoint
 app.post("/api/chat", async (req, res) => {
   try {
-    const { message, history } = req.body;
+    const parsedInput = ChatSchema.safeParse(req.body);
+    if (!parsedInput.success) {
+      return res.status(400).json({ error: "Invalid request payload format", details: parsedInput.error.issues });
+    }
+
+    const { message, history } = parsedInput.data;
     if (!apiKey) {
       return res.status(200).json({
         text: "⚠️ **Gemini API Key is missing!** Please configure the `GEMINI_API_KEY` secret in your environment settings (Settings > Secrets) to enable AI assistance. Currently showing simulated responses.",
@@ -83,22 +144,31 @@ When answering:
 3. Keep responses structured with markdown, bullet points, or lists for high readability on mobile screens during chaotic match environments.
 4. If a question is in another language, translate your understanding and reply in that language or offer clear support.
 5. Emphasize sustainability (e.g., recommend reusable bottle refill hubs at Sec 108 or 132, waste segregation, green routes).
-6. Give helpful, realistic responses without mentioning that you are reading from a raw JSON configuration. Present yourself as a fully integrated stadium brain.`;
+6. Give helpful, realistic responses without mentioning that you are reading from a raw JSON configuration. Present yourself as a fully integrated stadium brain.
+7. For every operational action, emergency instruction, or SOP checklist recommendation you formulate, you MUST strictly include these three dimensions in the response: **Who** (the designated responder, steward, or agency), **Why** (the rationale, urgency context, or standard SOP rule), and **Impact** (the safety metric or strategic outcome achieved). Ensure this context is clearly visible to the user.`;
 
     const chatSessionContents = [];
+    
+    const sanitizedMessage = sanitizeInput(message);
+    const sanitizedHistory = Array.isArray(history)
+      ? history.map((h: any) => ({
+          role: h.role === "user" ? "user" : "model",
+          content: sanitizeInput(h.content)
+        }))
+      : [];
     
     // Add history in the format required by SDK (or plain string aggregation if easier)
     // To ensure perfect SDK compatibility, we can structure it or pass as aggregated string.
     // The gemini-3.5-flash handles rich conversational text natively. Let's build a single aggregated prompt.
     let fullPrompt = "";
-    if (history && history.length > 0) {
+    if (sanitizedHistory && sanitizedHistory.length > 0) {
       fullPrompt += "Conversation History:\n";
-      history.forEach((h: any) => {
+      sanitizedHistory.forEach((h: any) => {
         const speaker = h.role === "user" ? "User" : "StadiumMind AI";
         fullPrompt += `${speaker}: ${h.content}\n`;
       });
     }
-    fullPrompt += `User: ${message}`;
+    fullPrompt += `User: ${sanitizedMessage}`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
@@ -126,21 +196,25 @@ When answering:
 // 2. Multilingual AI Translator Endpoint
 app.post("/api/translate", async (req, res) => {
   try {
-    const { text, targetLanguage } = req.body;
-    if (!text || !targetLanguage) {
-      return res.status(400).json({ error: "Missing text or targetLanguage" });
+    const parsedInput = TranslateSchema.safeParse(req.body);
+    if (!parsedInput.success) {
+      return res.status(400).json({ error: "Invalid translation query payload", details: parsedInput.error.issues });
     }
+
+    const { text, targetLanguage } = parsedInput.data;
+    const sanitizedText = sanitizeInput(text);
+    const sanitizedLang = sanitizeInput(targetLanguage);
 
     if (!apiKey) {
       return res.json({
-        translatedText: `[Simulated Translation to ${targetLanguage}]: ${text}`,
+        translatedText: `[Simulated Translation to ${sanitizedLang}]: ${sanitizedText}`,
         detectedLanguage: "English (Simulated)"
       });
     }
 
-    const prompt = `Translate the following stadium announcement or support text into ${targetLanguage}. 
+    const prompt = `Translate the following stadium announcement or support text into ${sanitizedLang}. 
 Detect the source language automatically. Return a JSON response with 'translatedText' and 'detectedLanguage'.
-Source text: "${text}"`;
+Source text: "${sanitizedText}"`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
@@ -170,7 +244,15 @@ Source text: "${text}"`;
 // 3. Sustainability AI Route Recommendation
 app.post("/api/sustainability", async (req, res) => {
   try {
-    const { startSection, endSection } = req.body;
+    const parsedInput = SustainabilitySchema.safeParse(req.body);
+    if (!parsedInput.success) {
+      return res.status(400).json({ error: "Invalid sustainability routing points", details: parsedInput.error.issues });
+    }
+
+    const { startSection, endSection } = parsedInput.data;
+    const sanitizedStart = sanitizeInput(startSection);
+    const sanitizedEnd = sanitizeInput(endSection);
+
     if (!apiKey) {
       return res.json({
         ecoScore: 92,
@@ -180,7 +262,7 @@ app.post("/api/sustainability", async (req, res) => {
       });
     }
 
-    const prompt = `Recommend a sustainable transit route inside MetLife Stadium from Section ${startSection || "120"} to Section ${endSection || "108"}. 
+    const prompt = `Recommend a sustainable transit route inside MetLife Stadium from Section ${sanitizedStart} to Section ${sanitizedEnd}. 
 Highlight eco-friendly milestones (like reusable water bottle refill hubs, plastic recycling bins, and low-energy lighting corridors).
 Estimate carbon footprint savings in kilograms (e.g. 0.2 to 0.8 kg) compared to buying single-use plastics.
 Return JSON with 'ecoScore' (number 1-100), 'reusableStationsPassed' (array of strings), 'carbonSavingKg' (number), and 'tip' (string).`;
@@ -215,32 +297,43 @@ Return JSON with 'ecoScore' (number 1-100), 'reusableStationsPassed' (array of s
 // 4. Emergency Response AI Checklist
 app.post("/api/emergency", async (req, res) => {
   try {
-    const { type, location, details } = req.body;
-    if (!type || !location) {
-      return res.status(400).json({ error: "Missing emergency type or location" });
+    const parsedInput = EmergencySchema.safeParse(req.body);
+    if (!parsedInput.success) {
+      return res.status(400).json({ error: "Invalid emergency incident parameters", details: parsedInput.error.issues });
     }
+
+    const { type, location, details } = parsedInput.data;
+    const sanitizedType = sanitizeInput(type);
+    const sanitizedLocation = sanitizeInput(location);
+    const sanitizedDetails = sanitizeInput(details || "");
 
     if (!apiKey) {
       return res.json({
         severity: "Critical",
         immediateActions: [
-          `Dispatch first responder to Section ${location} immediately.`,
-          "Alert nearest security post (West Gate Post 4).",
-          "Clear the emergency corridor for ambulance ingress."
+          `Dispatch stadium medical responders (Who) directly to Section ${sanitizedLocation} to deliver triage care (Why) and ensure immediate patient safety (Impact).`,
+          `Notify Section 110 First Aid Post A team (Who) for immediate stretcher readiness (Why) to fast-track emergency evacuation (Impact).`,
+          "Direct elevator operators (Who) to secure elevator West-3 for medical extraction egress (Why) to minimize transit bottlenecking (Impact)."
         ],
         checklist: [
-          "Check breathing and consciousness.",
-          "Apply AED if located (nearest AED is at First Aid Station A, Sec 110).",
-          "Stay on radio channel 3 for real-time updates."
+          "On-site Lead Responder (Who) checks patient breathing and vital signs (Why) to record critical status baseline (Impact).",
+          "Stadium security stewards (Who) clear the local corridor crowd (Why) to prevent panic and ease responder movement (Impact).",
+          "Crisis communications lead (Who) updates dispatcher on Radio Channel 4 (Why) to coordinate logistical backup if needed (Impact)."
         ],
-        announcement: `Medical support is en route to Section ${location}. Please make way for first responders.`
+        announcement: `Medical support is en route to Section ${sanitizedLocation}. Please make way for first responders.`
       });
     }
 
     const prompt = `You are a crisis coordinator for the FIFA World Cup 2026. 
-Formulate an immediate operational checklist for a ${type} emergency reported at location ${location}.
-Details provided: "${details || "None"}".
+Formulate an immediate operational checklist for a ${sanitizedType} emergency reported at location ${sanitizedLocation}.
+Details provided: "${sanitizedDetails}".
 Analyze stadium layout (First Aid Station A at Section 110, First Aid Station B at Section 131).
+
+For every checklist item in 'immediateActions' and 'checklist', you MUST strictly include the following dimensions clearly within the text description:
+- **Who**: Specify the designated responder, agency, or stadium operator responsible for the task.
+- **Why**: State the operational rationale or safety policy behind the action.
+- **Impact**: Detail the desired safety or operational outcome/metric achieved.
+
 Return a JSON structure with 'severity' ('Critical', 'High', 'Moderate'), 'immediateActions' (array of strings), 'checklist' (array of strings), and 'announcement' (string of a public announcement message suitable to broadcast).`;
 
     const response = await ai.models.generateContent({
@@ -273,7 +366,15 @@ Return a JSON structure with 'severity' ('Critical', 'High', 'Moderate'), 'immed
 // 5. Volunteer AI Task Guidance & SOPs
 app.post("/api/volunteer", async (req, res) => {
   try {
-    const { category, query } = req.body;
+    const parsedInput = VolunteerSchema.safeParse(req.body);
+    if (!parsedInput.success) {
+      return res.status(400).json({ error: "Invalid volunteer task query", details: parsedInput.error.issues });
+    }
+
+    const { category, query } = parsedInput.data;
+    const sanitizedCategory = sanitizeInput(category || "General");
+    const sanitizedQuery = sanitizeInput(query || "What to do with lost and found items?");
+
     if (!apiKey) {
       return res.json({
         answer: "Provide standard friendly guidance. Escort lost fans to the nearest Info Desk (located behind Sec 118 & 136). For lost items, direct them to file a ticket or hand it over to Gate D Lost & Found Hub.",
@@ -286,7 +387,7 @@ app.post("/api/volunteer", async (req, res) => {
     }
 
     const prompt = `You are the Volunteer Supervisor AI for FIFA 2026. 
-Provide a clear operational answer and standard operating procedure for a volunteer asking about category "${category || "General"}" and query: "${query || "What to do with lost and found items?"}".
+Provide a clear operational answer and standard operating procedure for a volunteer asking about category "${sanitizedCategory}" and query: "${sanitizedQuery}".
 Return a JSON object with 'answer' (string) and 'checklist' (array of strings).`;
 
     const response = await ai.models.generateContent({

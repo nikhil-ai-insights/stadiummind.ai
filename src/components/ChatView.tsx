@@ -257,8 +257,9 @@ export default function ChatView({
 
           <div className="space-y-3">
             <div>
-              <label className="text-[10px] text-brand-text-secondary font-mono uppercase tracking-wider block mb-1">Target Language</label>
+              <label htmlFor="target-lang-select" className="text-[10px] text-brand-text-secondary font-mono uppercase tracking-wider block mb-1">Target Language</label>
               <select
+                id="target-lang-select"
                 value={selectedLanguage}
                 onChange={(e) => setSelectedLanguage(e.target.value)}
                 className="w-full text-xs bg-brand-surface border border-brand-border focus:border-brand-primary text-white rounded-lg p-2 focus:outline-none"
@@ -270,8 +271,9 @@ export default function ChatView({
             </div>
 
             <div>
-              <label className="text-[10px] text-brand-text-secondary font-mono uppercase tracking-wider block mb-1">Source Text</label>
+              <label htmlFor="translator-source-text" className="text-[10px] text-brand-text-secondary font-mono uppercase tracking-wider block mb-1">Source Text</label>
               <textarea
+                id="translator-source-text"
                 placeholder="Type announcements, medical cases or volunteer requests..."
                 value={translatingText}
                 onChange={(e) => setTranslatingText(e.target.value)}
@@ -456,6 +458,8 @@ export default function ChatView({
 
           <form onSubmit={handleSubmit} className="flex items-center space-x-2">
             <input
+              id="chat-image-uploader"
+              aria-label="Upload stadium ticket or emergency photo"
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
@@ -467,6 +471,7 @@ export default function ChatView({
               onClick={() => fileInputRef.current?.click()}
               className="p-2.5 rounded-xl bg-brand-surface hover:bg-white/5 border border-brand-border text-brand-text-secondary hover:text-brand-primary transition-all cursor-pointer"
               title="Upload stadium ticket or emergency photo"
+              aria-label="Upload stadium ticket or emergency photo"
             >
               <Upload className="w-4 h-4" />
             </button>
@@ -481,11 +486,14 @@ export default function ChatView({
                   : "bg-brand-surface hover:bg-white/5 border-brand-border text-brand-text-secondary hover:text-brand-primary"
               }`}
               title="Simulate Voice Assistant Input"
+              aria-label={isRecording ? "Stop voice assistant recording" : "Simulate voice assistant input"}
             >
               {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
             </button>
 
             <input
+              id="chat-user-prompt-input"
+              aria-label="Ask Stadium AI Assistant"
               type="text"
               placeholder={isRecording ? "Listening to simulated voice input..." : "Ask: 'Where is Gate C?' or 'ADA elevator platform?'..."}
               value={input}
@@ -498,6 +506,7 @@ export default function ChatView({
               type="submit"
               disabled={loading || (!input.trim() && !uploadedFile)}
               className="p-2.5 rounded-xl bg-brand-primary text-brand-bg hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center glow-btn cursor-pointer"
+              aria-label="Send message to AI assistant"
             >
               <Send className="w-4 h-4" />
             </button>

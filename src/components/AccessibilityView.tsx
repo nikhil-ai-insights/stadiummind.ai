@@ -79,28 +79,31 @@ export default function AccessibilityView({
 
             {/* High Contrast Toggle */}
             <div className="flex items-center justify-between p-3 bg-brand-surface border border-brand-border rounded-xl">
-              <div>
-                <p className="font-bold text-white flex items-center space-x-1">
+              <label htmlFor="high-contrast-toggle" className="cursor-pointer flex-1 mr-4">
+                <span className="font-bold text-white flex items-center space-x-1">
                   <Eye className="w-4 h-4 text-brand-primary" />
                   <span>High Contrast Mode</span>
-                </p>
-                <p className="text-[10px] text-brand-text-secondary mt-0.5">Increases text color ratios to 7:1</p>
-              </div>
+                </span>
+                <span className="text-[10px] text-brand-text-secondary mt-0.5 block">Increases text color ratios to 7:1</span>
+              </label>
               <input
+                id="high-contrast-toggle"
                 type="checkbox"
                 checked={config.highContrast}
                 onChange={(e) => onUpdateConfig({ highContrast: e.target.checked })}
                 className="w-4 h-4 text-brand-primary accent-brand-primary cursor-pointer"
+                aria-describedby="high-contrast-desc"
               />
             </div>
 
             {/* Screen Reader Enablement */}
             <div className="flex items-center justify-between p-3 bg-brand-surface border border-brand-border rounded-xl">
-              <div>
-                <p className="font-bold text-white">ARIA Screen Reader Helpers</p>
-                <p className="text-[10px] text-brand-text-secondary mt-0.5">Injects verbal alt-text descriptions</p>
-              </div>
+              <label htmlFor="screen-reader-toggle" className="cursor-pointer flex-1 mr-4">
+                <span className="font-bold text-white block">ARIA Screen Reader Helpers</span>
+                <span className="text-[10px] text-brand-text-secondary mt-0.5 block">Injects verbal alt-text descriptions</span>
+              </label>
               <input
+                id="screen-reader-toggle"
                 type="checkbox"
                 checked={config.screenReader}
                 onChange={(e) => onUpdateConfig({ screenReader: e.target.checked })}
@@ -110,11 +113,12 @@ export default function AccessibilityView({
 
             {/* Voice Guidance Toggle */}
             <div className="flex items-center justify-between p-3 bg-brand-surface border border-brand-border rounded-xl">
-              <div>
-                <p className="font-bold text-white">Voice Guided Audio Help</p>
-                <p className="text-[10px] text-brand-text-secondary mt-0.5">Triggers automatic text-to-speech audio</p>
-              </div>
+              <label htmlFor="voice-guided-toggle" className="cursor-pointer flex-1 mr-4">
+                <span className="font-bold text-white block">Voice Guided Audio Help</span>
+                <span className="text-[10px] text-brand-text-secondary mt-0.5 block">Triggers automatic text-to-speech audio</span>
+              </label>
               <input
+                id="voice-guided-toggle"
                 type="checkbox"
                 checked={config.voiceGuided}
                 onChange={(e) => onUpdateConfig({ voiceGuided: e.target.checked })}

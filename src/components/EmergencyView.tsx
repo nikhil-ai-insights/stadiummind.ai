@@ -36,14 +36,14 @@ export default function EmergencyView({ onNavigate }: EmergencyViewProps) {
       setResponseSop({
         severity: "High",
         immediateActions: [
-          `Deploy medical responders directly to ${location}.`,
-          `Notify nearest medical post A (Sec 110) for stretcher readiness.`,
-          "Prepare elevator West-3 for medical extraction egress."
+          `Deploy stadium medical responders (Who) directly to Section ${location} to deliver triage care (Why) and ensure immediate patient safety (Impact).`,
+          `Notify Section 110 First Aid Post A team (Who) for immediate stretcher readiness (Why) to fast-track emergency evacuation (Impact).`,
+          "Direct elevator operators (Who) to secure elevator West-3 for medical extraction egress (Why) to minimize transit bottlenecking (Impact)."
         ],
         checklist: [
-          "Check breathing and vital signs.",
-          "Clear the corridor crowd to prevent panic.",
-          "Keep dispatcher updated on Radio Channel 4."
+          "On-site Lead Responder (Who) checks patient breathing and vital signs (Why) to record critical status baseline (Impact).",
+          "Stadium security stewards (Who) clear the local corridor crowd (Why) to prevent panic and ease responder movement (Impact).",
+          "Crisis communications lead (Who) updates dispatcher on Radio Channel 4 (Why) to coordinate logistical backup if needed (Impact)."
         ],
         announcement: `Medical staff are responding to Section ${location}. Please make way for responders. Stay calm.`
       });

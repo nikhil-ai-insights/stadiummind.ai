@@ -5,18 +5,31 @@ import {
   ShieldCheck, AlertTriangle, Settings, User, Users, Sparkles, LogOut, Menu, X, ArrowRight
 } from "lucide-react";
 
-// Sub-views
+// Sub-views (Lazy-loaded for production-grade bundle optimization)
 import Navbar from "./components/Navbar";
-import LandingView from "./components/LandingView";
-import DashboardView from "./components/DashboardView";
-import ChatView from "./components/ChatView";
-import MapView from "./components/MapView";
-import TransportView from "./components/TransportView";
-import AccessibilityView from "./components/AccessibilityView";
-import VolunteerView from "./components/VolunteerView";
-import OrganizerView from "./components/OrganizerView";
-import SustainabilityView from "./components/SustainabilityView";
-import EmergencyView from "./components/EmergencyView";
+const LandingView = React.lazy(() => import("./components/LandingView"));
+const DashboardView = React.lazy(() => import("./components/DashboardView"));
+const ChatView = React.lazy(() => import("./components/ChatView"));
+const MapView = React.lazy(() => import("./components/MapView"));
+const TransportView = React.lazy(() => import("./components/TransportView"));
+const AccessibilityView = React.lazy(() => import("./components/AccessibilityView"));
+const VolunteerView = React.lazy(() => import("./components/VolunteerView"));
+const OrganizerView = React.lazy(() => import("./components/OrganizerView"));
+const SustainabilityView = React.lazy(() => import("./components/SustainabilityView"));
+const EmergencyView = React.lazy(() => import("./components/EmergencyView"));
+
+// Skeleton loader for Suspense boundaries
+function ViewSkeleton() {
+  return (
+    <div className="max-w-6xl mx-auto px-4 py-8 space-y-6 animate-pulse">
+      <div className="h-8 bg-white/5 border border-white/10 rounded-2xl w-1/4"></div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse-subtle">
+        <div className="md:col-span-2 h-96 bg-white/5 border border-white/10 rounded-3xl"></div>
+        <div className="h-96 bg-white/5 border border-white/10 rounded-3xl"></div>
+      </div>
+    </div>
+  );
+}
 
 // Initial datasets
 import { 
@@ -337,56 +350,58 @@ export default function App() {
         {/* Main Content Pane */}
         <main className="flex-1 overflow-y-auto bg-brand-bg relative">
           {/* Active view renderer */}
-          {currentView === "landing" && (
-            <LandingView onEnterApp={(prefillView, prefillPrompt) => navigateTo(prefillView || "dashboard", prefillPrompt)} />
-          )}
-          {currentView === "dashboard" && (
-            <DashboardView 
-              matches={matches} 
-              gates={gates} 
-              transport={transport}
-              onTriggerGoal={handleTriggerGoal}
-              onSimulateInflow={handleSimulateInflow}
-              onNavigate={navigateTo}
-            />
-          )}
-          {currentView === "chat" && (
-            <ChatView 
-              messages={messages} 
-              onSendMessage={handleSendMessage} 
-              onClearHistory={handleClearHistory}
-              prefillPrompt={prefillPrompt}
-            />
-          )}
-          {currentView === "map" && (
-            <MapView onNavigate={navigateTo} />
-          )}
-          {currentView === "transport" && (
-            <TransportView transport={transport} onNavigate={navigateTo} />
-          )}
-          {currentView === "accessibility" && (
-            <AccessibilityView 
-              config={accessibility} 
-              onUpdateConfig={(cfg) => setAccessibility((prev) => ({ ...prev, ...cfg }))} 
-              onNavigate={navigateTo}
-            />
-          )}
-          {currentView === "volunteer" && (
-            <VolunteerView 
-              tasks={tasks} 
-              onToggleTask={handleToggleTask} 
-              onAddTask={handleAddTask}
-            />
-          )}
-          {currentView === "organizer" && (
-            <OrganizerView matchTimer={formattedTimer} />
-          )}
-          {currentView === "sustainability" && (
-            <SustainabilityView onNavigate={navigateTo} />
-          )}
-          {currentView === "emergency" && (
-            <EmergencyView onNavigate={navigateTo} />
-          )}
+          <React.Suspense fallback={<ViewSkeleton />}>
+            {currentView === "landing" && (
+              <LandingView onEnterApp={(prefillView, prefillPrompt) => navigateTo(prefillView || "dashboard", prefillPrompt)} />
+            )}
+            {currentView === "dashboard" && (
+              <DashboardView 
+                matches={matches} 
+                gates={gates} 
+                transport={transport}
+                onTriggerGoal={handleTriggerGoal}
+                onSimulateInflow={handleSimulateInflow}
+                onNavigate={navigateTo}
+              />
+            )}
+            {currentView === "chat" && (
+              <ChatView 
+                messages={messages} 
+                onSendMessage={handleSendMessage} 
+                onClearHistory={handleClearHistory}
+                prefillPrompt={prefillPrompt}
+              />
+            )}
+            {currentView === "map" && (
+              <MapView onNavigate={navigateTo} />
+            )}
+            {currentView === "transport" && (
+              <TransportView transport={transport} onNavigate={navigateTo} />
+            )}
+            {currentView === "accessibility" && (
+              <AccessibilityView 
+                config={accessibility} 
+                onUpdateConfig={(cfg) => setAccessibility((prev) => ({ ...prev, ...cfg }))} 
+                onNavigate={navigateTo}
+              />
+            )}
+            {currentView === "volunteer" && (
+              <VolunteerView 
+                tasks={tasks} 
+                onToggleTask={handleToggleTask} 
+                onAddTask={handleAddTask}
+              />
+            )}
+            {currentView === "organizer" && (
+              <OrganizerView matchTimer={formattedTimer} />
+            )}
+            {currentView === "sustainability" && (
+              <SustainabilityView onNavigate={navigateTo} />
+            )}
+            {currentView === "emergency" && (
+              <EmergencyView onNavigate={navigateTo} />
+            )}
+          </React.Suspense>
         </main>
       </div>
 
